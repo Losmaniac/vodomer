@@ -5,9 +5,9 @@ const { getMessaging } = require("firebase-admin/messaging");
 
 initializeApp();
 
-// Fires at 08:00 Europe/Prague on the 1st of every month.
-exports.monthlyMeterReminder = onSchedule(
-  { schedule: "0 8 1 * *", timeZone: "Europe/Prague" },
+// Fires at 10:00 Europe/Prague every Monday.
+exports.weeklyMeterReminder = onSchedule(
+  { schedule: "0 10 * * 1", timeZone: "Europe/Prague" },
   async () => {
     const db = getFirestore();
     const snapshot = await db.collection("fcmTokens").get();
@@ -18,7 +18,7 @@ exports.monthlyMeterReminder = onSchedule(
       tokens,
       notification: {
         title: "Odečet vodoměru",
-        body: "Je první den v měsíci — nezapomeň zapsat stav vodoměru.",
+        body: "Nezapomeň zapsat stav vodoměru.",
       },
     });
 

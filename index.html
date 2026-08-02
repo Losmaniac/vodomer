@@ -806,19 +806,25 @@
     const lastDate = new Date(last.date);
     const cutoff = new Date(lastDate.getTime() - 30 * 86400000);
 
+    // Find the latest reading at or before the 30-day cutoff to use as the
+    // base of the comparison. If none exists (all history is younger than
+    // 30 days), fall back to the very first reading.
     let base = null;
     for (let i = readings.length - 2; i >= 0; i--) {
       if (new Date(readings[i].date) <= cutoff) { base = readings[i]; break; }
     }
-    if (base) {
-      return { usage: last.value - base.value, estimated: false };
-    }
+    if (!base) base = readings[0];
 
-    const first = readings[0];
-    const days = (lastDate - new Date(first.date)) / 86400000;
+    const days = (lastDate - new Date(base.date)) / 86400000;
     if (days < 1) return null;
-    const usage = last.value - first.value;
-    return { usage: (usage / days) * 30, estimated: true };
+
+    // Prorate to a 30-day equivalent since `base` is rarely exactly 30 days
+    // before `last` — without this, sparse readings (e.g. one every few
+    // months) would report the full-period usage mislabeled as "30 days".
+    const dailyRate = (last.value - base.value) / days;
+    const usage = dailyRate * 30;
+    const estimated = Math.abs(days - 30) > 3;
+    return { usage, estimated };
   }
 
   function renderStats() {

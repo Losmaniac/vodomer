@@ -1,0 +1,899 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vodoměr — evidence stavů</title>
+<style>
+  :root {
+    --ink: #14232b;
+    --ink-soft: #4c6067;
+    --paper: #f4f8f7;
+    --panel: #ffffff;
+    --panel-sunken: #eaf1f0;
+    --line: #d7e1df;
+    --accent: #1c7c86;
+    --accent-ink: #0d4a52;
+    --accent-warm: #c97a3a;
+    --good: #2f8f5b;
+    --shadow: 0 1px 2px rgba(20, 35, 43, 0.06), 0 8px 24px -12px rgba(20, 35, 43, 0.18);
+    --radius: 14px;
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #eef4f3;
+      --ink-soft: #9fb3b3;
+      --paper: #0e1a1d;
+      --panel: #152325;
+      --panel-sunken: #0e1a1d;
+      --line: #253537;
+      --accent: #56b6bf;
+      --accent-ink: #bfe6e9;
+      --accent-warm: #e0985a;
+      --good: #6bc492;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ink: #eef4f3;
+    --ink-soft: #9fb3b3;
+    --paper: #0e1a1d;
+    --panel: #152325;
+    --panel-sunken: #0e1a1d;
+    --line: #253537;
+    --accent: #56b6bf;
+    --accent-ink: #bfe6e9;
+    --accent-warm: #e0985a;
+    --good: #6bc492;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+
+  :root[data-theme="light"] {
+    --ink: #14232b;
+    --ink-soft: #4c6067;
+    --paper: #f4f8f7;
+    --panel: #ffffff;
+    --panel-sunken: #eaf1f0;
+    --line: #d7e1df;
+    --accent: #1c7c86;
+    --accent-ink: #0d4a52;
+    --accent-warm: #c97a3a;
+    --good: #2f8f5b;
+    --shadow: 0 1px 2px rgba(20, 35, 43, 0.06), 0 8px 24px -12px rgba(20, 35, 43, 0.18);
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    margin: 0;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    padding-bottom: 3rem;
+  }
+
+  .content {
+    width: 100%;
+    max-width: min(100%, 96rem);
+    margin: 0 auto;
+    padding: 0 clamp(1.1rem, 3.5vw, 3.25rem);
+  }
+
+  .topbar {
+    width: 100%;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .topbar .content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-top: 1.1rem;
+    padding-bottom: 1.1rem;
+  }
+
+  @media (min-width: 860px) {
+    .topbar .content { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+  }
+
+  .eyebrow {
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 700;
+    margin: 0 0 0.15rem;
+  }
+
+  h1 {
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+    font-size: 1.5rem;
+    margin: 0;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  @media (min-width: 860px) {
+    h1 { font-size: 1.9rem; }
+  }
+
+  .meter-icon {
+    width: 2.35rem;
+    height: 2.35rem;
+    flex-shrink: 0;
+    color: var(--accent);
+  }
+
+  .theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 999px;
+    border: 1.5px solid var(--line);
+    background: var(--panel-sunken);
+    color: var(--ink);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .theme-toggle:hover { border-color: var(--accent); }
+  .theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .theme-toggle svg { width: 1.2rem; height: 1.2rem; }
+  .theme-toggle .icon-moon { display: none; }
+  .theme-toggle.is-dark .icon-sun { display: none; }
+  .theme-toggle.is-dark .icon-moon { display: block; }
+
+  main.content {
+    padding-top: 1.5rem;
+  }
+
+  @media (min-width: 860px) {
+    main.content { padding-top: 2rem; }
+  }
+
+  .layout {
+    display: flex;
+    flex-direction: column;
+  }
+
+  @media (min-width: 860px) {
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(19rem, 30%) 1fr;
+      align-items: start;
+      gap: 1.75rem;
+    }
+    .col-history { grid-column: 2; grid-row: 1 / span 2; }
+    .col-main { grid-column: 1; }
+  }
+
+  section.card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.2rem;
+    margin-bottom: 1.1rem;
+  }
+
+  @media (min-width: 860px) {
+    section.card { padding: 1.5rem; }
+  }
+
+  .card h2 {
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 0.9rem;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .sync-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: var(--good);
+    flex-shrink: 0;
+  }
+  .sync-dot.offline { background: var(--accent-warm); }
+
+  label {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    margin-bottom: 0.35rem;
+    font-weight: 600;
+  }
+
+  .field { margin-bottom: 0.9rem; }
+  .field:last-of-type { margin-bottom: 0; }
+
+  .reading-input {
+    width: 100%;
+    font-family: ui-monospace, "SF Mono", "Menlo", "Consolas", monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 2.1rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    padding: 0.65rem 0.7rem;
+    border: 1.5px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel-sunken);
+    color: var(--ink);
+    text-align: right;
+  }
+  .reading-input:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+    border-color: var(--accent);
+  }
+
+  input[type="date"], input[type="text"] {
+    width: 100%;
+    font: inherit;
+    font-size: 0.95rem;
+    padding: 0.6rem 0.7rem;
+    border: 1.5px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel-sunken);
+    color: var(--ink);
+  }
+  input[type="date"]:focus, input[type="text"]:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+    border-color: var(--accent);
+  }
+
+  #price {
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 0.5rem 0.6rem;
+    border: 1.5px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel-sunken);
+    color: var(--ink);
+    width: 6rem;
+    text-align: right;
+  }
+  #price:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+    border-color: var(--accent);
+  }
+
+  .row2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.7rem;
+  }
+
+  .hint {
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    margin-top: 0.5rem;
+    min-height: 1.1em;
+  }
+  .hint.warn { color: var(--accent-warm); font-weight: 600; }
+
+  button.primary {
+    width: 100%;
+    margin-top: 1rem;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 700;
+    padding: 0.85rem;
+    cursor: pointer;
+    transition: filter 0.15s ease, transform 0.05s ease;
+  }
+  button.primary:hover { filter: brightness(1.08); }
+  button.primary:active { transform: scale(0.99); }
+  button.primary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  .stat-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.7rem;
+  }
+  .stat {
+    background: var(--panel-sunken);
+    border-radius: 10px;
+    padding: 0.7rem 0.8rem;
+  }
+  .stat .label {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+  .stat .value {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  .stat .value small { font-size: 0.7rem; font-weight: 500; color: var(--ink-soft); }
+
+  .cost-divider {
+    height: 1px;
+    background: var(--line);
+    margin: 1.1rem 0 1rem;
+  }
+
+  .cost-price-field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.9rem;
+  }
+  .cost-price-field label {
+    margin-bottom: 0;
+    flex-shrink: 0;
+  }
+
+  canvas#spark {
+    width: 100%;
+    height: 64px;
+    display: block;
+    margin-top: 0.9rem;
+  }
+
+  .log {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  @media (min-width: 1180px) {
+    .log {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      column-gap: 1.5rem;
+    }
+    .log li { border-bottom: 1px solid var(--line); }
+  }
+
+  .log li {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.65rem 0.1rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .log li:last-child { border-bottom: none; }
+
+  .log .date {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+  }
+  .log .note {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+    font-style: italic;
+    margin-top: 0.1rem;
+  }
+  .log .value {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 1.05rem;
+    font-weight: 600;
+    text-align: right;
+  }
+  .log .delta {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.2rem 0.45rem;
+    border-radius: 999px;
+    background: var(--panel-sunken);
+    color: var(--accent-ink);
+    white-space: nowrap;
+    justify-self: end;
+  }
+
+  .del-btn {
+    background: none;
+    border: none;
+    color: var(--ink-soft);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0.2rem 0.35rem;
+    border-radius: 6px;
+  }
+  .del-btn:hover { background: var(--panel-sunken); color: var(--accent-warm); }
+  .del-btn:focus-visible { outline: 2px solid var(--accent); }
+
+  .empty {
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 0.88rem;
+    padding: 1.2rem 0.5rem;
+  }
+
+  .storage-note {
+    text-align: center;
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+    margin-top: 1.6rem;
+    padding-bottom: 0.5rem;
+    line-height: 1.5;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    button.primary { transition: none; }
+  }
+</style>
+
+<header class="topbar">
+  <div class="content">
+    <div class="brand">
+      <svg class="meter-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+        <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="2.5"/>
+        <circle cx="24" cy="24" r="2.5" fill="currentColor"/>
+        <line x1="24" y1="24" x2="24" y2="10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="24" y1="24" x2="33" y2="30" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+      </svg>
+      <div>
+        <p class="eyebrow">Domácí evidence</p>
+        <h1>Stav vodoměru</h1>
+      </div>
+    </div>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Přepnout světlý a tmavý režim" aria-pressed="false">
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7"/>
+      </svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<main class="content">
+  <div class="layout">
+    <div class="col-main">
+      <section class="card">
+        <h2>Nový záznam</h2>
+        <div class="field">
+          <label for="value">Stav (m³)</label>
+          <input class="reading-input" id="value" type="number" inputmode="decimal" step="0.001" placeholder="0,000" autocomplete="off">
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="date">Datum</label>
+            <input id="date" type="date">
+          </div>
+          <div class="field">
+            <label for="note">Poznámka</label>
+            <input id="note" type="text" placeholder="volitelné" autocomplete="off">
+          </div>
+        </div>
+        <p class="hint" id="hint"></p>
+        <button class="primary" id="save">Uložit stav</button>
+      </section>
+
+      <section class="card" id="statsCard" hidden>
+        <h2>Přehled</h2>
+        <div class="stat-row">
+          <div class="stat">
+            <div class="label">Poslední odečet</div>
+            <div class="value" id="statLast">—</div>
+          </div>
+          <div class="stat">
+            <div class="label">Denní spotřeba (Ø)</div>
+            <div class="value" id="statAvg">—</div>
+          </div>
+        </div>
+        <canvas id="spark" width="600" height="64"></canvas>
+
+        <div class="cost-divider"></div>
+
+        <div class="field cost-price-field">
+          <label for="price">Cena vody (Kč/m³)</label>
+          <input id="price" type="number" inputmode="decimal" step="0.01" min="0">
+        </div>
+        <div class="stat-row">
+          <div class="stat">
+            <div class="label">Útrata / 30 dní</div>
+            <div class="value" id="statMonthSpend">—</div>
+          </div>
+          <div class="stat">
+            <div class="label">Průměrná útrata (Ø)</div>
+            <div class="value" id="statDailySpend">—</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="col-history">
+      <section class="card">
+        <h2>Historie záznamů <span class="sync-dot" id="syncDot"></span></h2>
+        <ul class="log" id="log"></ul>
+        <p class="empty" id="empty">Zatím žádné záznamy. Zadejte první stav vodoměru výše.</p>
+      </section>
+    </div>
+  </div>
+
+  <p class="storage-note" id="storageNote">Data se ukládají online a jsou vidět na všech tvých zařízeních.</p>
+</main>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+  import {
+    getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot,
+    enableIndexedDbPersistence,
+  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBnrU7HrOAZy7WdsmTMRGThZ1wKvBoaOVM",
+    authDomain: "vodomer434.firebaseapp.com",
+    projectId: "vodomer434",
+    storageBucket: "vodomer434.firebasestorage.app",
+    messagingSenderId: "299950311854",
+    appId: "1:299950311854:web:d4f8f325d2c23a80a4603f",
+  };
+
+  const firebaseApp = initializeApp(firebaseConfig);
+  const db = getFirestore(firebaseApp);
+  enableIndexedDbPersistence(db).catch(() => {});
+  const readingsCol = collection(db, "readings");
+
+  const THEME_KEY = "vodomer-theme";
+  const PRICE_KEY = "vodomer-price-per-m3";
+  const DEFAULT_PRICE = 125;
+  const dateEl = document.getElementById("date");
+  const valueEl = document.getElementById("value");
+  const noteEl = document.getElementById("note");
+  const hintEl = document.getElementById("hint");
+  const saveBtn = document.getElementById("save");
+  const logEl = document.getElementById("log");
+  const emptyEl = document.getElementById("empty");
+  const statsCard = document.getElementById("statsCard");
+  const statLast = document.getElementById("statLast");
+  const statAvg = document.getElementById("statAvg");
+  const statMonthSpend = document.getElementById("statMonthSpend");
+  const statDailySpend = document.getElementById("statDailySpend");
+  const priceEl = document.getElementById("price");
+  const sparkEl = document.getElementById("spark");
+  const themeToggle = document.getElementById("themeToggle");
+  const syncDot = document.getElementById("syncDot");
+  const root = document.documentElement;
+
+  const storedPrice = parseFloat(localStorage.getItem(PRICE_KEY));
+  priceEl.value = Number.isFinite(storedPrice) ? storedPrice : DEFAULT_PRICE;
+  priceEl.addEventListener("input", () => {
+    const p = parseFloat(priceEl.value);
+    if (Number.isFinite(p) && p >= 0) localStorage.setItem(PRICE_KEY, p);
+    renderStats();
+  });
+
+  function systemPrefersDark() {
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  function applyThemeUI(theme) {
+    themeToggle.classList.toggle("is-dark", theme === "dark");
+    themeToggle.setAttribute("aria-pressed", theme === "dark" ? "true" : "false");
+  }
+  function setTheme(theme) {
+    root.setAttribute("data-theme", theme);
+    localStorage.setItem(THEME_KEY, theme);
+    applyThemeUI(theme);
+  }
+
+  const storedTheme = localStorage.getItem(THEME_KEY);
+  if (storedTheme === "dark" || storedTheme === "light") {
+    root.setAttribute("data-theme", storedTheme);
+    applyThemeUI(storedTheme);
+  } else {
+    applyThemeUI(systemPrefersDark() ? "dark" : "light");
+  }
+
+  themeToggle.addEventListener("click", () => {
+    const active = root.getAttribute("data-theme") || (systemPrefersDark() ? "dark" : "light");
+    setTheme(active === "dark" ? "light" : "dark");
+  });
+
+  if (window.matchMedia) {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", e => {
+      if (!localStorage.getItem(THEME_KEY)) applyThemeUI(e.matches ? "dark" : "light");
+    });
+  }
+
+  function todayISO() {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 10);
+  }
+  dateEl.value = todayISO();
+
+  function fmt(n) {
+    return n.toLocaleString("cs-CZ", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+  }
+  function fmtDate(iso) {
+    const [y, m, d] = iso.split("-");
+    return `${d}. ${m}. ${y}`;
+  }
+
+  let readings = [];
+
+  onSnapshot(readingsCol, { includeMetadataChanges: true }, snapshot => {
+    readings = snapshot.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => a.date.localeCompare(b.date) || a.ts - b.ts);
+    syncDot.classList.toggle("offline", snapshot.metadata.fromCache);
+    syncDot.title = snapshot.metadata.fromCache
+      ? "Offline — změny se odešlou po připojení"
+      : "Synchronizováno online";
+    render();
+  }, () => {
+    syncDot.classList.add("offline");
+    syncDot.title = "Nepodařilo se připojit k online úložišti";
+  });
+
+  function render() {
+    logEl.innerHTML = "";
+    emptyEl.hidden = readings.length > 0;
+
+    const rev = [...readings].reverse();
+    rev.forEach((r, idxRev) => {
+      const idx = readings.length - 1 - idxRev;
+      const prev = readings[idx - 1];
+      const li = document.createElement("li");
+
+      const dateWrap = document.createElement("div");
+      dateWrap.innerHTML = `<span class="date">${fmtDate(r.date)}</span>` +
+        (r.note ? `<span class="note">${escapeHtml(r.note)}</span>` : "");
+
+      const valSpan = document.createElement("span");
+      valSpan.className = "value";
+      valSpan.textContent = fmt(r.value) + " m³";
+
+      const deltaSpan = document.createElement("span");
+      deltaSpan.className = "delta";
+      if (prev) {
+        const d = r.value - prev.value;
+        deltaSpan.textContent = (d >= 0 ? "+" : "") + fmt(d);
+      } else {
+        deltaSpan.textContent = "start";
+      }
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "del-btn";
+      delBtn.setAttribute("aria-label", "Smazat záznam");
+      delBtn.textContent = "✕";
+      delBtn.addEventListener("click", () => {
+        deleteDoc(doc(db, "readings", r.id)).catch(() => {
+          hintEl.textContent = "Smazání se nepodařilo odeslat, zkuste to znovu.";
+          hintEl.classList.add("warn");
+        });
+      });
+
+      li.appendChild(dateWrap);
+      li.appendChild(valSpan);
+      const right = document.createElement("div");
+      right.style.display = "flex";
+      right.style.alignItems = "center";
+      right.style.gap = "0.4rem";
+      right.appendChild(deltaSpan);
+      right.appendChild(delBtn);
+      li.appendChild(right);
+
+      logEl.appendChild(li);
+    });
+
+    renderStats();
+  }
+
+  function escapeHtml(s) {
+    const div = document.createElement("div");
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  function fmtCzk(n) {
+    return Math.round(n).toLocaleString("cs-CZ") + " Kč";
+  }
+
+  function lastMonthUsage() {
+    if (readings.length < 2) return null;
+    const last = readings[readings.length - 1];
+    const lastDate = new Date(last.date);
+    const cutoff = new Date(lastDate.getTime() - 30 * 86400000);
+
+    let base = null;
+    for (let i = readings.length - 2; i >= 0; i--) {
+      if (new Date(readings[i].date) <= cutoff) { base = readings[i]; break; }
+    }
+    if (base) {
+      return { usage: last.value - base.value, estimated: false };
+    }
+
+    const first = readings[0];
+    const days = (lastDate - new Date(first.date)) / 86400000;
+    if (days < 1) return null;
+    const usage = last.value - first.value;
+    return { usage: (usage / days) * 30, estimated: true };
+  }
+
+  function renderStats() {
+    if (readings.length === 0) {
+      statsCard.hidden = true;
+      return;
+    }
+    statsCard.hidden = false;
+    const last = readings[readings.length - 1];
+    statLast.textContent = fmt(last.value) + " m³";
+
+    const price = parseFloat(priceEl.value) || 0;
+
+    if (readings.length >= 2) {
+      const first = readings[0];
+      const totalUse = last.value - first.value;
+      const days = Math.max(1, (new Date(last.date) - new Date(first.date)) / 86400000);
+      const avg = totalUse / days;
+      statAvg.innerHTML = fmt(avg) + ' <small>m³/den</small>';
+      statDailySpend.innerHTML = fmtCzk(avg * price) + ' <small>/den</small>';
+    } else {
+      statAvg.innerHTML = '<small>zatím nelze spočítat</small>';
+      statDailySpend.innerHTML = '<small>zatím nelze spočítat</small>';
+    }
+
+    const month = lastMonthUsage();
+    if (month) {
+      statMonthSpend.innerHTML = fmtCzk(month.usage * price) + (month.estimated ? ' <small>odhad</small>' : '');
+    } else {
+      statMonthSpend.innerHTML = '<small>zatím nelze spočítat</small>';
+    }
+
+    drawSpark();
+  }
+
+  function drawSpark() {
+    const ctx = sparkEl.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = sparkEl.clientWidth || 300;
+    const cssH = 64;
+    sparkEl.width = cssW * dpr;
+    sparkEl.height = cssH * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+
+    if (readings.length < 2) return;
+
+    const styles = getComputedStyle(document.documentElement);
+    const accent = styles.getPropertyValue("--accent").trim();
+    const line = styles.getPropertyValue("--line").trim();
+
+    const values = readings.map(r => r.value);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const pad = 6;
+    const span = max - min || 1;
+
+    ctx.strokeStyle = line;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, cssH - pad + 0.5);
+    ctx.lineTo(cssW, cssH - pad + 0.5);
+    ctx.stroke();
+
+    const pts = values.map((v, i) => {
+      const x = (i / (values.length - 1)) * (cssW - pad * 2) + pad;
+      const y = cssH - pad - ((v - min) / span) * (cssH - pad * 2);
+      return [x, y];
+    });
+
+    const grad = ctx.createLinearGradient(0, 0, 0, cssH);
+    grad.addColorStop(0, hexToRgba(accent, 0.25));
+    grad.addColorStop(1, hexToRgba(accent, 0.02));
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], cssH - pad);
+    pts.forEach(p => ctx.lineTo(p[0], p[1]));
+    ctx.lineTo(pts[pts.length - 1][0], cssH - pad);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.beginPath();
+    pts.forEach((p, i) => (i === 0 ? ctx.moveTo(...p) : ctx.lineTo(...p)));
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+
+    const endPt = pts[pts.length - 1];
+    ctx.beginPath();
+    ctx.arc(endPt[0], endPt[1], 3.2, 0, Math.PI * 2);
+    ctx.fillStyle = accent;
+    ctx.fill();
+  }
+
+  function hexToRgba(hex, alpha) {
+    hex = hex.replace("#", "");
+    if (hex.length === 3) hex = hex.split("").map(c => c + c).join("");
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  function checkHint() {
+    const v = parseFloat(valueEl.value);
+    if (isNaN(v)) { hintEl.textContent = ""; hintEl.classList.remove("warn"); return; }
+    const last = readings[readings.length - 1];
+    if (last && v < last.value) {
+      hintEl.textContent = `Pozor: nižší než poslední odečet (${fmt(last.value)} m³).`;
+      hintEl.classList.add("warn");
+    } else {
+      hintEl.textContent = "";
+      hintEl.classList.remove("warn");
+    }
+  }
+  valueEl.addEventListener("input", checkHint);
+
+  saveBtn.addEventListener("click", () => {
+    const v = parseFloat(valueEl.value);
+    if (isNaN(v)) {
+      hintEl.textContent = "Zadejte platnou hodnotu.";
+      hintEl.classList.add("warn");
+      valueEl.focus();
+      return;
+    }
+    const date = dateEl.value || todayISO();
+    saveBtn.disabled = true;
+    addDoc(readingsCol, { date, value: v, note: noteEl.value.trim(), ts: Date.now() })
+      .catch(() => {
+        hintEl.textContent = "Uložení se nepodařilo odeslat, zkuste to znovu.";
+        hintEl.classList.add("warn");
+      })
+      .finally(() => { saveBtn.disabled = false; });
+    valueEl.value = "";
+    noteEl.value = "";
+    hintEl.textContent = "";
+    hintEl.classList.remove("warn");
+    valueEl.focus();
+  });
+
+  valueEl.addEventListener("keydown", e => {
+    if (e.key === "Enter") saveBtn.click();
+  });
+
+  render();
+
+  window.addEventListener("resize", () => { if (readings.length >= 2) drawSpark(); });
+</script>

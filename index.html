@@ -1,6 +1,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vodoměr — evidence stavů</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Vodoměr">
+<meta name="theme-color" content="#1c7c86">
 <style>
   :root {
     --ink: #14232b;
@@ -472,6 +478,12 @@
         <h1>Stav vodoměru</h1>
       </div>
     </div>
+    <button class="theme-toggle" id="notifyToggle" type="button" aria-label="Zapnout upozornění na odečet" title="Upozornit na odečet vodoměru">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      </svg>
+    </button>
     <button class="theme-toggle" id="themeToggle" type="button" aria-label="Přepnout světlý a tmavý režim" aria-pressed="false">
       <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
         <circle cx="12" cy="12" r="4.2"/>
@@ -555,9 +567,12 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
   import {
-    getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot,
+    getFirestore, collection, addDoc, deleteDoc, doc, setDoc, onSnapshot,
     enableIndexedDbPersistence,
   } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+  import {
+    getMessaging, getToken, onMessage, isSupported as messagingIsSupported,
+  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyBnrU7HrOAZy7WdsmTMRGThZ1wKvBoaOVM",
@@ -572,6 +587,10 @@
   const db = getFirestore(firebaseApp);
   enableIndexedDbPersistence(db).catch(() => {});
   const readingsCol = collection(db, "readings");
+  const tokensCol = collection(db, "fcmTokens");
+
+  // Generate in Firebase Console → Project settings → Cloud Messaging → Web Push certificates.
+  const VAPID_KEY = "REPLACE_WITH_YOUR_VAPID_PUBLIC_KEY";
 
   const THEME_KEY = "vodomer-theme";
   const PRICE_KEY = "vodomer-price-per-m3";
@@ -633,6 +652,58 @@
       if (!localStorage.getItem(THEME_KEY)) applyThemeUI(e.matches ? "dark" : "light");
     });
   }
+
+  const notifyToggle = document.getElementById("notifyToggle");
+
+  function applyNotifyUI() {
+    const enabled = "Notification" in window && Notification.permission === "granted";
+    notifyToggle.classList.toggle("is-dark", enabled);
+    notifyToggle.setAttribute("aria-pressed", enabled ? "true" : "false");
+    notifyToggle.title = enabled
+      ? "Upozornění na odečet je zapnuté"
+      : "Upozornit na odečet vodoměru";
+  }
+  applyNotifyUI();
+
+  async function enableReadingReminder() {
+    if (!("Notification" in window) || !("serviceWorker" in navigator)) {
+      alert("Tento prohlížeč nepodporuje upozornění.");
+      return;
+    }
+    if (!(await messagingIsSupported().catch(() => false))) {
+      alert("Push notifikace tu nejsou podporované. Na iPhonu appku nejdřív přidej na plochu (Sdílet → Přidat na plochu) a spusť ji odtud.");
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    applyNotifyUI();
+    if (permission !== "granted") return;
+    try {
+      const registration = await navigator.serviceWorker.register("firebase-messaging-sw.js");
+      const messaging = getMessaging(firebaseApp);
+      const token = await getToken(messaging, {
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration: registration,
+      });
+      if (token) {
+        await setDoc(doc(tokensCol, token), { token, updatedAt: new Date().toISOString() });
+      }
+      onMessage(messaging, (payload) => {
+        const { title, body } = payload.notification || {};
+        new Notification(title || "Vodoměr", { body, icon: "icons/icon-192.png" });
+      });
+    } catch (err) {
+      console.error("Nepodařilo se zapnout upozornění:", err);
+      alert("Zapnutí upozornění selhalo. Zkus to prosím znovu.");
+    }
+  }
+
+  notifyToggle.addEventListener("click", () => {
+    if ("Notification" in window && Notification.permission === "granted") {
+      alert("Upozornění na odečet je už zapnuté.");
+      return;
+    }
+    enableReadingReminder();
+  });
 
   function todayISO() {
     const d = new Date();
@@ -735,19 +806,25 @@
     const lastDate = new Date(last.date);
     const cutoff = new Date(lastDate.getTime() - 30 * 86400000);
 
+    // Find the latest reading at or before the 30-day cutoff to use as the
+    // base of the comparison. If none exists (all history is younger than
+    // 30 days), fall back to the very first reading.
     let base = null;
     for (let i = readings.length - 2; i >= 0; i--) {
       if (new Date(readings[i].date) <= cutoff) { base = readings[i]; break; }
     }
-    if (base) {
-      return { usage: last.value - base.value, estimated: false };
-    }
+    if (!base) base = readings[0];
 
-    const first = readings[0];
-    const days = (lastDate - new Date(first.date)) / 86400000;
+    const days = (lastDate - new Date(base.date)) / 86400000;
     if (days < 1) return null;
-    const usage = last.value - first.value;
-    return { usage: (usage / days) * 30, estimated: true };
+
+    // Prorate to a 30-day equivalent since `base` is rarely exactly 30 days
+    // before `last` — without this, sparse readings (e.g. one every few
+    // months) would report the full-period usage mislabeled as "30 days".
+    const dailyRate = (last.value - base.value) / days;
+    const usage = dailyRate * 30;
+    const estimated = Math.abs(days - 30) > 3;
+    return { usage, estimated };
   }
 
   function renderStats() {

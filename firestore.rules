@@ -1,0 +1,17 @@
+rules_version = '2';
+
+// NOTE: reconcile this with whatever rules are already live in the Firebase
+// console before running `firebase deploy --only firestore:rules` — this
+// file only reflects what's needed for the readings app + reminder tokens.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /readings/{readingId} {
+      allow read, write: if true;
+    }
+
+    match /fcmTokens/{token} {
+      allow create, update: if true;
+      allow read, delete: if false; // only the Cloud Function (Admin SDK) touches these
+    }
+  }
+}

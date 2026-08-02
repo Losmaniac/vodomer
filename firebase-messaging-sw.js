@@ -19,4 +19,20 @@ messaging.onBackgroundMessage((payload) => {
     icon: "icons/icon-192.png",
     badge: "icons/icon-192.png",
   });
+  if (navigator.setAppBadge) {
+    navigator.setAppBadge(1).catch(() => {});
+  }
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  if (navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {});
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for (const client of list) {
+        if ("focus" in client) return client.focus();
+      }
+      if (clients.openWindow) return clients.openWindow("./index.html");
+    })
+  );
 });

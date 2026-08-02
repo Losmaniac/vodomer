@@ -705,6 +705,14 @@
     enableReadingReminder();
   });
 
+  function clearAppBadge() {
+    if (navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {});
+  }
+  clearAppBadge();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") clearAppBadge();
+  });
+
   function todayISO() {
     const d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());

@@ -14,9 +14,12 @@ exports.weeklyMeterReminder = onSchedule(
     if (snapshot.empty) return;
 
     const tokens = snapshot.docs.map((d) => d.id);
+    // Data-only payload: a top-level `notification` block would make the
+    // browser auto-display it in addition to our own showNotification()
+    // call in the service worker, producing a duplicate notification.
     const response = await getMessaging().sendEachForMulticast({
       tokens,
-      notification: {
+      data: {
         title: "Odečet vodoměru",
         body: "Nezapomeň zapsat stav vodoměru.",
       },

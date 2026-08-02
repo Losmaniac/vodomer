@@ -13,7 +13,7 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  const { title, body } = payload.notification || {};
+  const { title, body } = payload.data || {};
   self.registration.showNotification(title || "Vodoměr", {
     body: body || "Je čas odečíst vodoměr.",
     icon: "icons/icon-192.png",

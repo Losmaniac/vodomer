@@ -688,7 +688,7 @@
         await setDoc(doc(tokensCol, token), { token, updatedAt: new Date().toISOString() });
       }
       onMessage(messaging, (payload) => {
-        const { title, body } = payload.notification || {};
+        const { title, body } = payload.data || {};
         new Notification(title || "Vodoměr", { body, icon: "icons/icon-192.png" });
       });
     } catch (err) {

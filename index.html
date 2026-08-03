@@ -503,7 +503,7 @@
         <h2>Nový záznam</h2>
         <div class="field">
           <label for="value">Stav (m³)</label>
-          <input class="reading-input" id="value" type="number" inputmode="decimal" step="0.001" placeholder="0,000" autocomplete="off">
+          <input class="reading-input" id="value" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="0,000" autocomplete="off">
         </div>
         <div class="row2">
           <div class="field">
@@ -537,7 +537,7 @@
 
         <div class="field cost-price-field">
           <label for="price">Cena vody (Kč/m³)</label>
-          <input id="price" type="number" inputmode="decimal" step="0.01" min="0">
+          <input id="price" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
         </div>
         <div class="stat-row">
           <div class="stat">
@@ -616,7 +616,7 @@
   const storedPrice = parseFloat(localStorage.getItem(PRICE_KEY));
   priceEl.value = Number.isFinite(storedPrice) ? storedPrice : DEFAULT_PRICE;
   priceEl.addEventListener("input", () => {
-    const p = parseFloat(priceEl.value);
+    const p = parseDecimal(priceEl.value);
     if (Number.isFinite(p) && p >= 0) localStorage.setItem(PRICE_KEY, p);
     renderStats();
   });
@@ -844,7 +844,7 @@
     const last = readings[readings.length - 1];
     statLast.textContent = fmt(last.value) + " m³";
 
-    const price = parseFloat(priceEl.value) || 0;
+    const price = parseDecimal(priceEl.value) || 0;
 
     if (readings.length >= 2) {
       const first = readings[0];
@@ -937,8 +937,12 @@
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
+  function parseDecimal(str) {
+    return parseFloat(String(str).trim().replace(",", "."));
+  }
+
   function checkHint() {
-    const v = parseFloat(valueEl.value);
+    const v = parseDecimal(valueEl.value);
     if (isNaN(v)) { hintEl.textContent = ""; hintEl.classList.remove("warn"); return; }
     const last = readings[readings.length - 1];
     if (last && v < last.value) {
@@ -952,7 +956,7 @@
   valueEl.addEventListener("input", checkHint);
 
   saveBtn.addEventListener("click", () => {
-    const v = parseFloat(valueEl.value);
+    const v = parseDecimal(valueEl.value);
     if (isNaN(v)) {
       hintEl.textContent = "Zadejte platnou hodnotu.";
       hintEl.classList.add("warn");

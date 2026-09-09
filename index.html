@@ -536,7 +536,7 @@
         <div class="cost-divider"></div>
 
         <div class="field cost-price-field">
-          <label for="price">Cena vody (Kč/m³)</label>
+          <label for="price">Cena vody (Kč/m³ s DPH)</label>
           <input id="price" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
         </div>
         <div class="stat-row">
@@ -594,7 +594,11 @@
 
   const THEME_KEY = "vodomer-theme";
   const PRICE_KEY = "vodomer-price-per-m3";
-  const DEFAULT_PRICE = 125;
+  // Gross price including VAT — spend is usage x price, no tax is added on top.
+  const DEFAULT_PRICE = 144;
+  // Previous defaults. A stored value the user never touched is moved to the
+  // current default instead of silently keeping an outdated price.
+  const LEGACY_DEFAULT_PRICES = [125];
   const dateEl = document.getElementById("date");
   const valueEl = document.getElementById("value");
   const noteEl = document.getElementById("note");
@@ -613,7 +617,11 @@
   const syncDot = document.getElementById("syncDot");
   const root = document.documentElement;
 
-  const storedPrice = parseFloat(localStorage.getItem(PRICE_KEY));
+  let storedPrice = parseFloat(localStorage.getItem(PRICE_KEY));
+  if (Number.isFinite(storedPrice) && LEGACY_DEFAULT_PRICES.includes(storedPrice)) {
+    storedPrice = DEFAULT_PRICE;
+    localStorage.setItem(PRICE_KEY, DEFAULT_PRICE);
+  }
   priceEl.value = Number.isFinite(storedPrice) ? storedPrice : DEFAULT_PRICE;
   priceEl.addEventListener("input", () => {
     const p = parseDecimal(priceEl.value);
